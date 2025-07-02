@@ -14,25 +14,31 @@ struct CardFront: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .stroke(.green.opacity(0.5), lineWidth: 10)
+                .stroke(.green.opacity(0.7), lineWidth: 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.green.opacity(0.1))
+                )
+                .shadow(radius: 5)
                 .padding()
 
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.green.opacity(0.1))
-                .padding()
+            VStack(spacing: 20) {
+                Text("問題")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.green)
 
-            VStack {
-                Text("Question:")
-                    .font(Font.system(size: 50))
-
-                Text("textContent")
-                    .lineLimit(10)
-                    .font(Font.system(size: 40))
+                Text(textContent)
+                    .font(.system(size: 20))
                     .multilineTextAlignment(.center)
-                    .padding(25)
+                    .padding(.horizontal, 25)
+                    .lineLimit(5)
             }
         }
-        .rotation3DEffect(Angle(degrees: degree), axis: (x: 0, y: 1, z: 0))
+        .rotation3DEffect(
+            Angle(degrees: degree),
+            axis: (x: 0.0, y: 1.0, z: 0.0),
+            perspective: 0.3
+        )
     }
 }
 

@@ -24,15 +24,15 @@ struct AddQuestionView: View {
         Form{
             Section("Question") {
                 HStack {
-                    TextField("Type your question here",
+                    TextField("輸入你的問題",
                               text: $questionString)
                     Text("*").foregroundColor(.red)
                 }
             }
             Section("Answer") {
                 HStack {
-                    TextField("Type your question here",
-                              text: $questionString)
+                    TextField("輸入你的答案",
+                              text: $answerString)
                     Text("*").foregroundColor(.red)
                 }
             }
@@ -41,7 +41,7 @@ struct AddQuestionView: View {
                 Button(action: {
                     presentationMode.wrappedValue.dismiss()
                 }) {
-                    Text("Cancel")
+                    Text("取消")
                         .foregroundColor(.red)
                         .frame(maxWidth: .infinity)
                 }
@@ -51,11 +51,11 @@ struct AddQuestionView: View {
                         addItem()
                         presentationMode.wrappedValue.dismiss()
                     }) {
-                        Text("Save")
+                        Text("儲存")
                             .frame(maxWidth: .infinity)
                         }
                     } else {
-                        Text("Save")
+                        Text("儲存")
                             .foregroundColor(.secondary)
                             .frame(maxWidth: .infinity)
                     }
