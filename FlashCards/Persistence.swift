@@ -181,10 +181,11 @@ struct PersistenceController {
     static var preview: PersistenceController = {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
-        for (question, answer) in defaultFlashCards {
+        for (index, (question, answer)) in defaultFlashCards.enumerated() {
             let newItem = Item(context: viewContext)
             newItem.question = question
             newItem.answer = answer
+            newItem.sortIndex = Int32(index)
         }
         do {
             try viewContext.save()

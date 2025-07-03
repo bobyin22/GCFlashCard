@@ -23,7 +23,7 @@ struct QuizView: View {
     @Environment(\.managedObjectContext) private var viewContext
     
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.question, ascending: true)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \Item.sortIndex, ascending: true)],
         animation: .default)
     private var items: FetchedResults<Item>
     
@@ -37,6 +37,33 @@ struct QuizView: View {
             questionNum = 0
         } else if questionNum >= items.count {
             questionNum = items.count - 1
+        }
+    }
+    
+    private func shuffleCards() {
+        let itemCount = items.count
+        guard itemCount > 1 else { return }
+        
+        // 生成隨機排序索引
+        var indices = Array(0..<itemCount)
+        indices.shuffle()
+        
+        // 更新每個項目的排序索引
+        for (index, item) in items.enumerated() {
+            item.sortIndex = Int32(indices[index])
+        }
+        
+        // 保存更改
+        do {
+            try viewContext.save()
+            // 重置當前問題編號
+            questionNum = 0
+            // 如果卡片是翻轉狀態，將其翻回正面
+            if isFlipped {
+                flipCard()
+            }
+        } catch {
+            print("無法保存洗牌結果：\(error)")
         }
     }
     
@@ -155,12 +182,27 @@ struct QuizView: View {
                 Spacer()
                 
                 VStack(spacing: 10) {
-                    Text("進度：\(questionNum + 1) / \(items.count)")
-                        .font(.headline)
-                    
-                    Text("總分：\(rightScore)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    HStack {
+                        Spacer()
+
+                        VStack(alignment: .center) {
+                            Text("進度：\(questionNum + 1) / \(items.count)")
+                                .font(.headline)
+                            Text("總分：\(rightScore)")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: shuffleCards) {
+                            Image(systemName: "shuffle")
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.borderless)
+                        .padding(.trailing, 20)
+                    }
                 }
                 .padding()
             }
