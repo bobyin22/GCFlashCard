@@ -14,6 +14,11 @@ struct QuizView: View {
     @State private var isFlipped = false
     
     @State private var questionNum = 0
+    @State private var offset = CGSize.zero
+    @State private var cardColor: Color = .clear
+    
+    @State private var leftScore = 0
+    @State private var rightScore = 0
     
     @Environment(\.managedObjectContext) private var viewContext
     
@@ -22,11 +27,66 @@ struct QuizView: View {
         animation: .default)
     private var items: FetchedResults<Item>
     
+    // 計算旋轉角度
+    private var rotation: Double {
+        return Double(offset.width / 20)
+    }
+    
     private func validateQuestionNum() {
         if items.isEmpty {
             questionNum = 0
         } else if questionNum >= items.count {
             questionNum = items.count - 1
+        }
+    }
+    
+    private func swipeCard(width: CGFloat) {
+        switch width {
+        case -500...(-150):
+            // 向左滑動 - 下一題且左邊加分
+            if questionNum < items.count - 1 {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    offset = CGSize(width: -1000, height: 100)
+                    leftScore += 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    questionNum += 1
+                    offset = .zero
+                    if isFlipped {
+                        flipCard()
+                    }
+                }
+            } else {
+                withAnimation(.spring()) {
+                    offset = .zero
+                }
+            }
+            
+        case 150...500:
+            // 向右滑動 - 下一題且右邊加分
+            if questionNum < items.count - 1 {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    offset = CGSize(width: 1000, height: 100)
+                    rightScore += 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    questionNum += 1
+                    offset = .zero
+                    if isFlipped {
+                        flipCard()
+                    }
+                }
+            } else {
+                withAnimation(.spring()) {
+                    offset = .zero
+                }
+            }
+            
+        default:
+            withAnimation(.spring()) {
+                offset = .zero
+                cardColor = .clear
+            }
         }
     }
     
@@ -40,72 +100,83 @@ struct QuizView: View {
             }
         } else {
             VStack {
+                Spacer()
+                
                 ZStack {
-                    CardFront(degree: $frontDegree, textContent: items[questionNum].question ?? "沒有問題")
-                    CardBack(degree: $backDegree, textContent: items[questionNum].answer ?? "沒有答案")
+                    ZStack {
+                        CardFront(degree: $frontDegree, textContent: items[questionNum].question ?? "沒有問題")
+                        CardBack(degree: $backDegree, textContent: items[questionNum].answer ?? "沒有答案")
+                    }
+                    
+                    VStack {
+                        HStack {
+                            Text("\(leftScore)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.red)
+                                .padding()
+                            
+                            Spacer()
+                            
+                            Text("\(rightScore)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.green)
+                                .padding()
+                        }
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+                .offset(offset)
+                .rotationEffect(.degrees(rotation))
+                .gesture(
+                    DragGesture()
+                        .onChanged { gesture in
+                            offset = gesture.translation
+                            // 根據拖動方向改變顏色提示
+                            let dragPercentage = gesture.translation.width / UIScreen.main.bounds.width
+                            if dragPercentage >= 0.1 {
+                                cardColor = .green.opacity(Double(dragPercentage))
+                            } else if dragPercentage <= -0.1 {
+                                cardColor = .red.opacity(Double(-dragPercentage))
+                            } else {
+                                cardColor = .clear
+                            }
+                        }
+                        .onEnded { gesture in
+                            swipeCard(width: gesture.translation.width)
+                        }
+                )
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         flipCard()
                     }
                 }
                 
-                HStack {
-                    if questionNum > 0 {
-                        Button(action: {
-                            withAnimation {
-                                if isFlipped {
-                                    flipCard()
-                                }
-                                questionNum -= 1
-                            }
-                        }){
-                            HStack {
-                                Image(systemName: "chevron.left")
-                                Text("上一題")
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                    } else {
-                        HStack {
-                            Image(systemName: "chevron.left")
-                            Text("上一題")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .foregroundColor(.secondary)
-                    }
-                    
-                    Text("\(questionNum + 1) / \(items.count)")
+                Spacer()
+                
+                VStack(spacing: 10) {
+                    Text("進度：\(questionNum + 1) / \(items.count)")
                         .font(.headline)
                     
-                    if questionNum < (items.count - 1) {
-                        Button(action: {
-                            withAnimation {
-                                if isFlipped {
-                                    flipCard()
-                                }
-                                questionNum += 1
-                            }
-                        }){
-                            HStack {
-                                Text("下一題")
-                                Image(systemName: "chevron.right")
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                    } else {
-                        HStack {
-                            Text("下一題")
-                            Image(systemName: "chevron.right")
-                        }
-                        .frame(maxWidth: .infinity)
+                    Text("總分：\(rightScore)")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
-                    }
                 }
                 .padding()
             }
             .onChange(of: items.count) { _ in
                 validateQuestionNum()
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        leftScore = 0
+                        rightScore = 0
+                        questionNum = 0
+                    }) {
+                        Text("重置")
+                    }
+                }
             }
         }
     }
