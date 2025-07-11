@@ -6,243 +6,182 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct QuizView: View {
-
-    @State private var backDegree = 90.0
-    @State private var frontDegree = 0.0
-    @State private var isFlipped = false
+    @Environment(\.managedObjectContext) private var viewContext
+    @FetchRequest private var items: FetchedResults<Item>
     
     @State private var questionNum = 0
-    @State private var offset = CGSize.zero
-    @State private var cardColor: Color = .clear
+    @State private var showingAnswer = false
+    @State private var correctCount = 0
+    @State private var wrongCount = 0
+    @State private var showingScore = false
+    @State private var dragState = CGSize.zero
+    @State private var cardRotation: Double = 0
+    @State private var isAnimatingNextCard = false
     
-    @State private var leftScore = 0
-    @State private var rightScore = 0
+    private let swipeThreshold: CGFloat = 100.0
+    private let rotationFactor: Double = 35.0
     
-    @Environment(\.managedObjectContext) private var viewContext
-    
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.sortIndex, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
-    
-    // 計算旋轉角度
-    private var rotation: Double {
-        return Double(offset.width / 20)
-    }
-    
-    private func validateQuestionNum() {
-        if items.isEmpty {
-            questionNum = 0
-        } else if questionNum >= items.count {
-            questionNum = items.count - 1
-        }
-    }
-    
-    private func shuffleCards() {
-        let itemCount = items.count
-        guard itemCount > 1 else { return }
-        
-        // 生成隨機排序索引
-        var indices = Array(0..<itemCount)
-        indices.shuffle()
-        
-        // 更新每個項目的排序索引
-        for (index, item) in items.enumerated() {
-            item.sortIndex = Int32(indices[index])
-        }
-        
-        // 保存更改
-        do {
-            try viewContext.save()
-            // 重置當前問題編號
-            questionNum = 0
-            // 如果卡片是翻轉狀態，將其翻回正面
-            if isFlipped {
-                flipCard()
-            }
-        } catch {
-            print("無法保存洗牌結果：\(error)")
-        }
-    }
-    
-    private func swipeCard(width: CGFloat) {
-        switch width {
-        case -500...(-150):
-            // 向左滑動 - 下一題且左邊加分
-            if questionNum < items.count - 1 {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    offset = CGSize(width: -1000, height: 100)
-                    leftScore += 1
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    questionNum += 1
-                    offset = .zero
-                    if isFlipped {
-                        flipCard()
-                    }
-                }
-            } else {
-                withAnimation(.spring()) {
-                    offset = .zero
-                }
-            }
-            
-        case 150...500:
-            // 向右滑動 - 下一題且右邊加分
-            if questionNum < items.count - 1 {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    offset = CGSize(width: 1000, height: 100)
-                    rightScore += 1
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    questionNum += 1
-                    offset = .zero
-                    if isFlipped {
-                        flipCard()
-                    }
-                }
-            } else {
-                withAnimation(.spring()) {
-                    offset = .zero
-                }
-            }
-            
-        default:
-            withAnimation(.spring()) {
-                offset = .zero
-                cardColor = .clear
-            }
-        }
+    init(category: String) {
+        _items = FetchRequest<Item>(
+            sortDescriptors: [NSSortDescriptor(keyPath: \Item.sortIndex, ascending: true)],
+            predicate: NSPredicate(format: "category == %@", category)
+        )
     }
     
     var body: some View {
-        if items.isEmpty {
-            VStack {
-                Text("沒有閃卡")
+        VStack {
+            if items.isEmpty {
+                Text("這個類別還沒有題目")
                     .font(.title)
-                Text("請先新增一些問題")
-                    .foregroundColor(.secondary)
-            }
-        } else {
-            VStack {
-                Spacer()
-                
-                ZStack {
-                    ZStack {
-                        CardFront(degree: $frontDegree, textContent: items[questionNum].question ?? "沒有問題")
-                        CardBack(degree: $backDegree, textContent: items[questionNum].answer ?? "沒有答案")
-                    }
-                    
-                    VStack {
-                        HStack {
-                            Text("\(leftScore)")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.red)
-                                .padding()
-                            
-                            Spacer()
-                            
-                            Text("\(rightScore)")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.green)
-                                .padding()
-                        }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .offset(offset)
-                .rotationEffect(.degrees(rotation))
-                .gesture(
-                    DragGesture()
-                        .onChanged { gesture in
-                            offset = gesture.translation
-                            // 根據拖動方向改變顏色提示
-                            let dragPercentage = gesture.translation.width / UIScreen.main.bounds.width
-                            if dragPercentage >= 0.1 {
-                                cardColor = .green.opacity(Double(dragPercentage))
-                            } else if dragPercentage <= -0.1 {
-                                cardColor = .red.opacity(Double(-dragPercentage))
-                            } else {
-                                cardColor = .clear
-                            }
-                        }
-                        .onEnded { gesture in
-                            swipeCard(width: gesture.translation.width)
-                        }
-                )
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        flipCard()
-                    }
-                }
-                
-                Spacer()
-                
+                    .foregroundColor(.gray)
+            } else {
+                // 進度和分數顯示
                 VStack(spacing: 10) {
                     HStack {
                         Spacer()
-
+                        
                         VStack(alignment: .center) {
                             Text("進度：\(questionNum + 1) / \(items.count)")
                                 .font(.headline)
-                            Text("總分：\(rightScore)")
+                            Text("正確：\(correctCount) 錯誤：\(wrongCount)")
                                 .font(.subheadline)
-                                .foregroundColor(.secondary)
                         }
                         
                         Spacer()
                         
                         Button(action: shuffleCards) {
                             Image(systemName: "shuffle")
-                                .font(.system(size: 20))
-                                .foregroundColor(.blue)
+                                .font(.title2)
                         }
-                        .buttonStyle(.borderless)
-                        .padding(.trailing, 20)
+                        .padding(.horizontal)
                     }
-                }
-                .padding()
-            }
-            .onChange(of: items.count) { _ in
-                validateQuestionNum()
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        leftScore = 0
-                        rightScore = 0
-                        questionNum = 0
-                    }) {
-                        Text("重置")
+                    .padding()
+                    
+                    // 卡片視圖
+                    GeometryReader { geometry in
+                        ZStack {
+                            ForEach(Array(items.enumerated().reversed()), id: \.1) { index, item in
+                                if index >= questionNum && index <= questionNum + 1 {
+                                    let isTopCard = index == questionNum
+                                    
+                                    ZStack {
+                                        if showingAnswer {
+                                            CardBack(text: item.answer ?? "")
+                                        } else {
+                                            CardFront(text: item.question ?? "")
+                                        }
+                                    }
+                                    .offset(x: isTopCard ? dragState.width : 0, y: isTopCard ? 0 : 20)
+                                    .scaleEffect(isTopCard ? 1 : 0.95)
+                                    .rotationEffect(.degrees(isTopCard ? Double(dragState.width) / rotationFactor : 0))
+                                    .gesture(isTopCard && !isAnimatingNextCard ? dragGesture : nil)
+                                    .animation(.easeInOut(duration: 0.2), value: dragState)
+                                    .animation(.easeInOut(duration: 0.2), value: questionNum)
+                                    .onTapGesture {
+                                        withAnimation {
+                                            showingAnswer.toggle()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             }
         }
+        .alert("測驗結束", isPresented: $showingScore) {
+            Button("重新開始", action: resetQuiz)
+        } message: {
+            Text("正確：\(correctCount)\n錯誤：\(wrongCount)\n正確率：\(String(format: "%.1f", Double(correctCount) / Double(correctCount + wrongCount) * 100))%")
+        }
     }
     
-    private func flipCard() {
-        isFlipped.toggle()
-        if isFlipped {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                frontDegree = -90
+    private var dragGesture: some Gesture {
+        DragGesture()
+            .onChanged { gesture in
+                dragState = gesture.translation
+                cardRotation = Double(gesture.translation.width) / rotationFactor
             }
-            withAnimation(.easeInOut(duration: 0.15).delay(0.15)) {
-                backDegree = 0
+            .onEnded { gesture in
+                if abs(dragState.width) > swipeThreshold {
+                    // 向右滑動表示記住了，向左滑動表示沒記住
+                    if dragState.width > 0 {
+                        correctCount += 1
+                    } else {
+                        wrongCount += 1
+                    }
+                    
+                    isAnimatingNextCard = true
+                    
+                    // 執行滑出動畫
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        dragState.width = dragState.width > 0 ? 1000 : -1000
+                    }
+                    
+                    // 等待滑出動畫完成後再切換到下一題
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        questionNum += 1
+                        showingAnswer = false
+
+                        dragState = .zero
+                        cardRotation = 0
+                        isAnimatingNextCard = false
+                    }
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        dragState = .zero
+                        cardRotation = 0
+                    }
+                }
             }
+    }
+    
+    private func nextQuestion() {
+        if questionNum < items.count - 1 {
+            questionNum += 1
         } else {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                backDegree = 90
+            showingScore = true
+        }
+    }
+    
+    private func resetQuiz() {
+        withAnimation {
+            questionNum = 0
+            correctCount = 0
+            wrongCount = 0
+            showingAnswer = false
+            dragState = .zero
+            cardRotation = 0
+            isAnimatingNextCard = false
+        }
+    }
+    
+    private func shuffleCards() {
+        withAnimation {
+            // 更新所有卡片的排序索引
+            let shuffledIndices = Array(0..<items.count).shuffled()
+            for (index, item) in items.enumerated() {
+                item.sortIndex = Int32(shuffledIndices[index])
             }
-            withAnimation(.easeInOut(duration: 0.15).delay(0.15)) {
-                frontDegree = 0
+            
+            // 保存更改
+            do {
+                try viewContext.save()
+            } catch {
+                print("Error shuffling cards: \(error)")
             }
+            
+            // 重置測驗狀態
+            resetQuiz()
         }
     }
 }
 
 #Preview {
-    QuizView()
+    QuizView(category: "Law & Business")
+        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

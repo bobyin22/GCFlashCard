@@ -8,40 +8,64 @@
 import SwiftUI
 
 struct CardBack: View {
-    @Binding var degree: Double
-    let textContent: String
-
+    let text: String
+    
+    var formattedText: AttributedString {
+        var result = AttributedString()
+        let lines = text.components(separatedBy: "\n")
+        
+        for line in lines {
+            if line.starts(with: "- ") {
+                // 關鍵詞
+                var keyword = AttributedString(line.dropFirst(2))
+                keyword.foregroundColor = .blue
+                keyword.font = .system(.body, design: .rounded, weight: .medium)
+                result += keyword + AttributedString("\n")
+            } else if line == "關鍵詞：" {
+                var header = AttributedString(line)
+                header.foregroundColor = .secondary
+                header.font = .system(.subheadline, design: .rounded, weight: .medium)
+                result += header + AttributedString("\n")
+            } else if !line.isEmpty {
+                // 一般文字
+                var normal = AttributedString(line)
+                normal.foregroundColor = .white
+                normal.font = .system(.body, design: .rounded)
+                result += normal + AttributedString("\n")
+            }
+        }
+        
+        return result
+    }
+    
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .stroke(.blue.opacity(0.7), lineWidth: 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.blue.opacity(0.1))
-                )
-                .shadow(radius: 5)
-                .padding()
+                .fill(Color(red: 0.1, green: 0.1, blue: 0.2))
+                .shadow(radius: 10)
             
-            VStack(spacing: 20) {
-                Text("答案")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.blue)
+            VStack {
+                Spacer()
                 
-                Text(textContent)
-                    .font(.system(size: 20))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 25)
-                    .lineLimit(5)
+                ScrollView {
+                    Text(formattedText)
+                        .multilineTextAlignment(.leading)
+                        .padding()
+                }
+                
+                Spacer()
+                
+                Text("點擊返回問題")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.bottom)
             }
         }
-        .rotation3DEffect(
-            Angle(degrees: degree),
-            axis: (x: 0.0, y: 1.0, z: 0.0),
-            perspective: 0.3
-        )
+        .frame(width: 320, height: 420)
     }
 }
 
-//#Preview {
-//    CardBack(degree: 0.0, textContent: "Answer string goes here")
-//}
+#Preview {
+    CardBack(text: "承包商不僅需要施工技能，還要具備業務、規劃與指導能力。\n\n關鍵詞：\n- 施工技能\n- 業務能力\n- 規劃能力\n- 指導能力")
+        .preferredColorScheme(.dark)
+}

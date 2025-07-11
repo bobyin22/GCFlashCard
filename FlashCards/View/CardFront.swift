@@ -8,40 +8,37 @@
 import SwiftUI
 
 struct CardFront: View {
-    @Binding var degree: Double
-    let textContent: String
-
+    let text: String
+    
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .stroke(.green.opacity(0.7), lineWidth: 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.green.opacity(0.1))
-                )
-                .shadow(radius: 5)
-                .padding()
-
-            VStack(spacing: 20) {
-                Text("問題")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.green)
-
-                Text(textContent)
-                    .font(.system(size: 20))
+                .fill(.white)
+                .shadow(radius: 10)
+            
+            VStack {
+                Spacer()
+                
+                Text(text)
+                    .font(.title2)
+                    .bold()
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 25)
-                    .lineLimit(5)
+                    .foregroundColor(.black)
+                    .padding()
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text("點擊查看答案")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.bottom)
             }
         }
-        .rotation3DEffect(
-            Angle(degrees: degree),
-            axis: (x: 0.0, y: 1.0, z: 0.0),
-            perspective: 0.3
-        )
+        .frame(width: 320, height: 420)
     }
 }
 
-//#Preview {
-//    CardFront(degree: 0.0, textContent: "Question string goes here")
-//}
+#Preview {
+    CardFront(text: "What is the purpose of a business plan?")
+}

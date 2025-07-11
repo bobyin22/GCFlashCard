@@ -9,80 +9,54 @@ import SwiftUI
 
 struct AddQuestionView: View {
     @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.question, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
-
-    @State var questionString: String = ""
-    @State var answerString: String = ""
-
-    @Environment(\.presentationMode) var presentationMode
-
+    @Environment(\.dismiss) private var dismiss
+    
+    let category: String
+    @State private var question = ""
+    @State private var answer = ""
+    
     var body: some View {
-        Form{
-            Section("Question") {
-                HStack {
-                    TextField("輸入你的問題",
-                              text: $questionString)
-                    Text("*").foregroundColor(.red)
+        NavigationView {
+            Form {
+                Section(header: Text("問題")) {
+                    TextField("輸入問題", text: $question)
+                }
+                
+                Section(header: Text("答案")) {
+                    TextField("輸入答案", text: $answer)
                 }
             }
-            Section("Answer") {
-                HStack {
-                    TextField("輸入你的答案",
-                              text: $answerString)
-                    Text("*").foregroundColor(.red)
+            .navigationTitle("新增問題")
+            .navigationBarItems(
+                leading: Button("取消") {
+                    dismiss()
+                },
+                trailing: Button("儲存") {
+                    saveItem()
                 }
-            }
-
-            HStack{
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    Text("取消")
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity)
-                }
-
-                if questionString != "" && answerString != "" {
-                    Button(action: {
-                        addItem()
-                        presentationMode.wrappedValue.dismiss()
-                    }) {
-                        Text("儲存")
-                            .frame(maxWidth: .infinity)
-                        }
-                    } else {
-                        Text("儲存")
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity)
-                    }
-            }
-
+                .disabled(question.isEmpty || answer.isEmpty)
+            )
         }
     }
-
-    private func addItem() {
+    
+    private func saveItem() {
         withAnimation {
             let newItem = Item(context: viewContext)
-            newItem.question = questionString
-            newItem.answer = answerString
-
+            newItem.question = question
+            newItem.answer = answer
+            newItem.category = category
+            
             do {
                 try viewContext.save()
+                dismiss()
             } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
                 let nsError = error as NSError
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
             }
         }
     }
-
 }
 
 #Preview {
-    AddQuestionView()
+    AddQuestionView(category: "Law & Business")
 }

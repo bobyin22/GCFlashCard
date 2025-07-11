@@ -6,75 +6,57 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct QuestionListView: View {
     @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.question, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
-
-    @State var showAddQuestionView = false
-
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(items) { item in
-                        Text(item.question!)
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: {showAddQuestionView = true}) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-            .navigationTitle("Questions")
-            .navigationViewStyle(StackNavigationViewStyle())
-        }
-        .sheet(isPresented: $showAddQuestionView, content: {
-            AddQuestionView()
-        })
+    let category: String
+    
+    @FetchRequest private var items: FetchedResults<Item>
+    
+    init(category: String) {
+        self.category = category
+        _items = FetchRequest<Item>(
+            sortDescriptors: [NSSortDescriptor(keyPath: \Item.sortIndex, ascending: true)],
+            predicate: NSPredicate(format: "category == %@", category)
+        )
     }
-
-//    private func addItem() {
-//        withAnimation {
-//            let newItem = Item(context: viewContext)
-//            newItem.timestamp = Date()
-//
-//            do {
-//                try viewContext.save()
-//            } catch {
-//                // Replace this implementation with code to handle the error appropriately.
-//                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-//                let nsError = error as NSError
-//                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-//            }
-//        }
-//    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+    
+    var body: some View {
+        List {
+            if items.isEmpty {
+                Text("尚無題目")
+                    .foregroundColor(.gray)
+                    .italic()
+            } else {
+                ForEach(items) { item in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(item.question ?? "")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Text(item.answer?.components(separatedBy: "\n\n").first ?? "")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .lineLimit(2)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                NavigationLink(destination: AddQuestionView(category: category)) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.blue)
+                }
             }
         }
     }
 }
 
 #Preview {
-    QuestionListView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    QuestionListView(category: "Business Organization")
+        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }
